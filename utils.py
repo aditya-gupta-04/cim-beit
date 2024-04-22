@@ -23,10 +23,10 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-from torch._six import inf
+# from torch._six import inf
 from modeling_discrete_vae import Dalle_VAE, DiscreteVAE
 
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 
 
 class SmoothedValue(object):
@@ -373,10 +373,11 @@ def get_grad_norm_(parameters, norm_type: float = 2.0) -> torch.Tensor:
     if len(parameters) == 0:
         return torch.tensor(0.)
     device = parameters[0].grad.device
-    if norm_type == inf:
-        total_norm = max(p.grad.detach().abs().max().to(device) for p in parameters)
-    else:
-        total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]), norm_type)
+    # if norm_type == inf:
+    #     total_norm = max(p.grad.detach().abs().max().to(device) for p in parameters)
+    # else:
+    #     total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]), norm_type)
+    total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]), norm_type)
     return total_norm
 
 
