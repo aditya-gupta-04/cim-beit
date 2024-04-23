@@ -55,14 +55,14 @@ def eval_linear(args):
 
     # ============ preparing data ... ============
     train_transform = pth_transforms.Compose([
-        pth_transforms.RandomResizedCrop(224),
+        # pth_transforms.RandomResizedCrop(224),
         pth_transforms.RandomHorizontalFlip(),
         pth_transforms.ToTensor(),
         pth_transforms.Normalize(mean, std),
     ])
     val_transform = pth_transforms.Compose([
-        pth_transforms.Resize(256, interpolation=3),
-        pth_transforms.CenterCrop(224),
+        # pth_transforms.Resize(256, interpolation=3),
+        # pth_transforms.CenterCrop(224),
         pth_transforms.ToTensor(),
         pth_transforms.Normalize(mean, std),
     ])
@@ -140,38 +140,40 @@ def eval_linear(args):
     start_epoch = to_restore["epoch"]
     best_acc = to_restore["best_acc"]
 
-    for epoch in range(start_epoch, args.epochs):
-        train_loader.sampler.set_epoch(epoch)
+    validate_network(val_loader, model, linear_classifier, args.avgpool_patchtokens, args.amp_forward)
 
-        train_stats = train(
-            model, linear_classifier, optimizer, train_loader, epoch, args.avgpool_patchtokens, args.amp_forward)
-        scheduler.step()
+    # for epoch in range(start_epoch, args.epochs):
+    #     train_loader.sampler.set_epoch(epoch)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     'epoch': epoch}
-        if epoch % args.val_freq == 0 or epoch == args.epochs - 1:
-            test_stats = validate_network(
-                val_loader, model, linear_classifier, args.avgpool_patchtokens, args.amp_forward)
-            for classifier_key in test_stats:
-                classifier = test_stats[classifier_key]
-                print(f"Accuracy at epoch {epoch} of the network on the {len(dataset_val)} test images: {classifier['acc1']:.1f}%")
-                best_acc = max(best_acc, classifier["acc1"])
-            print(f'Max accuracy so far: {best_acc:.2f}%')
-            log_stats = {**{k: v for k, v in log_stats.items()},
-                         **{f'test_{k}': v for k, v in test_stats.items()}}
-        if utils.is_main_process():
-            with (Path(args.output_dir) / "log.txt").open("a") as f:
-                f.write(json.dumps(log_stats) + "\n")
-            save_dict = {
-                "epoch": epoch + 1,
-                "state_dict": linear_classifier.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "scheduler": scheduler.state_dict(),
-                "best_acc": best_acc,
-            }
-            torch.save(save_dict, os.path.join(args.output_dir, "checkpoint.pth.tar"))
-    print("Training of the supervised linear classifier on frozen features completed.\n"
-                "Top-1 test accuracy: {acc:.1f}".format(acc=best_acc))
+    #     train_stats = train(
+    #         model, linear_classifier, optimizer, train_loader, epoch, args.avgpool_patchtokens, args.amp_forward)
+    #     scheduler.step()
+
+    #     log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+    #                  'epoch': epoch}
+    #     if epoch % args.val_freq == 0 or epoch == args.epochs - 1:
+    #         test_stats = validate_network(
+    #             val_loader, model, linear_classifier, args.avgpool_patchtokens, args.amp_forward)
+    #         for classifier_key in test_stats:
+    #             classifier = test_stats[classifier_key]
+    #             print(f"Accuracy at epoch {epoch} of the network on the {len(dataset_val)} test images: {classifier['acc1']:.1f}%")
+    #             best_acc = max(best_acc, classifier["acc1"])
+    #         print(f'Max accuracy so far: {best_acc:.2f}%')
+    #         log_stats = {**{k: v for k, v in log_stats.items()},
+    #                      **{f'test_{k}': v for k, v in test_stats.items()}}
+    #     if utils.is_main_process():
+    #         with (Path(args.output_dir) / "log.txt").open("a") as f:
+    #             f.write(json.dumps(log_stats) + "\n")
+    #         save_dict = {
+    #             "epoch": epoch + 1,
+    #             "state_dict": linear_classifier.state_dict(),
+    #             "optimizer": optimizer.state_dict(),
+    #             "scheduler": scheduler.state_dict(),
+    #             "best_acc": best_acc,
+    #         }
+    #         torch.save(save_dict, os.path.join(args.output_dir, "checkpoint.pth.tar"))
+    # print("Training of the supervised linear classifier on frozen features completed.\n"
+    #             "Top-1 test accuracy: {acc:.1f}".format(acc=best_acc))
 
 
 def train(model, linear_classifier, optimizer, loader, epoch, avgpool, amp_forward):
