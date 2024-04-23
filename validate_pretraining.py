@@ -21,8 +21,12 @@ from torchvision import transforms as pth_transforms
 
 import utils
 import modeling_pretrain
+from datasets import build_beit_pretraining_dataset
 from timm.models import create_model
+from typing import Iterable
+from tqdm import tqdm
 
+import matplotlib.pyplot as plt
 
 def load_model(model, checkpoint_file, model_key, model_prefix):
     if checkpoint_file.startswith('https'):
@@ -50,41 +54,6 @@ def eval_linear(args):
     mean = (0.485, 0.456, 0.406) if args.imagenet_default_mean_and_std else (0.5, 0.5, 0.5)
     std = (0.229, 0.224, 0.225) if args.imagenet_default_mean_and_std else (0.5, 0.5, 0.5)
 
-    # ============ preparing data ... ============
-    train_transform = pth_transforms.Compose([
-        # pth_transforms.RandomResizedCrop(224),
-        pth_transforms.RandomHorizontalFlip(),
-        pth_transforms.ToTensor(),
-        pth_transforms.Normalize(mean, std),
-    ])
-    val_transform = pth_transforms.Compose([
-        # pth_transforms.Resize(256, interpolation=3),
-        # pth_transforms.CenterCrop(224),
-        pth_transforms.ToTensor(),
-        pth_transforms.Normalize(mean, std),
-    ])
-    print("train_transform = %s" % str(train_transform))
-    print("val_transform = %s" % str(val_transform))
-    dataset_train = datasets.ImageFolder(os.path.join(args.data_path, "train"), transform=train_transform)
-    dataset_val = datasets.ImageFolder(os.path.join(args.data_path, "val"), transform=val_transform)
-
-    sampler_train = torch.utils.data.RandomSampler(dataset_train)
-
-    train_loader = torch.utils.data.DataLoader(
-        dataset_train,
-        sampler=sampler_train,
-        batch_size=args.batch_size_per_gpu,
-        num_workers=args.num_workers,
-        pin_memory=True,
-    )
-    val_loader = torch.utils.data.DataLoader(
-        dataset_val,
-        batch_size=args.batch_size_per_gpu,
-        num_workers=args.num_workers,
-        pin_memory=True,
-    )
-    print(f"Data loaded with {len(dataset_train)} train and {len(dataset_val)} val imgs.")
-
     # ============ building network ... ============
     model = create_model(
         args.model, pretrained=False, num_classes=0, drop_rate=0, drop_path_rate=0,
@@ -93,20 +62,40 @@ def eval_linear(args):
         init_values=args.layer_scale_init_value,
     )
 
-    # model.cuda()
+    patch_size = model.patch_embed.patch_size
+    args.window_size = (args.input_size // patch_size[0], args.input_size // patch_size[1])
+
+    # ============ preparing data ... ============
+    
+    dataset = build_beit_pretraining_dataset(args)
+    sampler = torch.utils.data.RandomSampler(dataset)
+
+    data_loader = torch.utils.data.DataLoader(
+        dataset, sampler=sampler,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        pin_memory=args.pin_mem,
+        drop_last=True,
+    )
+
+    device = args.device
+    model.to(device)
     model.eval()
     print(f"Model {args.model} built.")
+
     # load weights to evaluate
     load_model(model=model, checkpoint_file=args.pretrained_weights, model_key=args.checkpoint_key, model_prefix="")
+    d_vae = utils.create_d_vae(
+        weight_path=args.discrete_vae_weight_path, d_vae_type=args.discrete_vae_type,
+        device=device, image_size=args.second_input_size)
 
-    train_stats = validate_one_epoch(
-            model, d_vae, val_loader, device)
+    validate_one_epoch(model, d_vae, data_loader, device)
 
 def validate_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
                     data_loader: Iterable, device: torch.device):
     model.eval()
 
-    for step, (batch, _) in enumerate(data_loader):
+    for step, (batch, _) in tqdm(enumerate(data_loader), total=len(data_loader)):
 
         samples, images, bool_masked_pos = batch
         images = images.to(device, non_blocking=True)
@@ -114,13 +103,20 @@ def validate_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
         bool_masked_pos = bool_masked_pos.to(device, non_blocking=True)
 
         with torch.no_grad():
-            input_ids = d_vae.get_codebook_indices(images).flatten(1)
             bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
-            labels = input_ids[bool_masked_pos]
 
-        with torch.cuda.amp.autocast():
-            outputs = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=False)
-            loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
+            with torch.cuda.amp.autocast():
+
+                outputs = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=True)
+                corrupted_images = d_vae(outputs.reshape(-1, 8192, 8, 8), no_process=True)
+                
+                # plt.subplot(1,3,1)
+                # plt.imshow(samples[1].detach().cpu().numpy().transpose(1,2,0))
+                # plt.subplot(1,3,2)
+                # plt.imshow(images[1].detach().cpu().numpy().transpose(1,2,0))
+                # plt.subplot(1,3,3)
+                # plt.imshow(corrupted_images[1].detach().cpu().numpy().transpose(1,2,0)[:,:,:3])
+                # plt.savefig("images.png")
 
 
 
@@ -162,7 +158,7 @@ if __name__ == '__main__':
         training (highest LR used during training). The learning rate is linearly scaled
         with the batch size, and specified here for a reference batch size of 256.
         We recommend tweaking the LR depending on the checkpoint evaluated.""")
-    parser.add_argument('--batch_size_per_gpu', default=128, type=int, help='Per-GPU batch-size')
+    parser.add_argument('--batch_size', default=128, type=int, help='Per-GPU batch-size')
     parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up
         distributed training; see https://pytorch.org/docs/stable/distributed.html""")
     parser.add_argument("--local_rank", default=0, type=int, help="Please ignore and do not set this argument.")
@@ -176,6 +172,29 @@ if __name__ == '__main__':
         help="""Set True to use the imagenet default mean and std, Set False will use the mean and std in Inception. 
         We recommand keep it same to the pre-training stage. """)
     parser.add_argument('--amp_forward', default=True, type=bool_flag, help='Use amp to inference the pre-trained model, which can speed up the evaluation. ')
+    parser.add_argument('--device', default='cuda',
+                        help='device to use for training / testing')
+    parser.add_argument("--discrete_vae_weight_path", type=str)
+    parser.add_argument("--discrete_vae_type", type=str, default="dall-e")
+
+    parser.add_argument('--input_size', default=224, type=int,
+                        help='images input size for backbone')
+    parser.add_argument('--second_input_size', default=112, type=int,
+                        help='images input size for discrete vae')
+
+    parser.add_argument('--train_interpolation', type=str, default='bicubic',
+                        help='Training interpolation (random, bilinear, bicubic default: "bicubic")')
+    parser.add_argument('--second_interpolation', type=str, default='lanczos',
+                        help='Interpolation for discrete vae (random, bilinear, bicubic default: "lanczos")')
+    
+    parser.add_argument('--num_mask_patches', default=75, type=int,
+                        help='number of the visual tokens/patches need be masked')
+    parser.add_argument('--max_mask_patches_per_block', type=int, default=None)
+    parser.add_argument('--min_mask_patches_per_block', type=int, default=16)
+
+    parser.add_argument('--pin_mem', action='store_true',
+                        help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
+    
 
     args = parser.parse_args()
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
