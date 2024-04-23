@@ -154,16 +154,19 @@ class RandomResizedCropAndInterpolationWithTwoPic:
         Returns:
             PIL Image: Randomly cropped and resized image.
         """
-        i, j, h, w = self.get_params(img, self.scale, self.ratio)
-        if isinstance(self.interpolation, (tuple, list)):
-            interpolation = random.choice(self.interpolation)
-        else:
-            interpolation = self.interpolation
-        if self.second_size is None:
-            return F.resized_crop(img, i, j, h, w, self.size, interpolation)
-        else:
-            return F.resized_crop(img, i, j, h, w, self.size, interpolation), \
-                   F.resized_crop(img, i, j, h, w, self.second_size, self.second_interpolation)
+
+        return img, img
+        
+        # i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        # if isinstance(self.interpolation, (tuple, list)):
+        #     interpolation = random.choice(self.interpolation)
+        # else:
+        #     interpolation = self.interpolation
+        # if self.second_size is None:
+        #     return F.resized_crop(img, i, j, h, w, self.size, interpolation)
+        # else:
+        #     return F.resized_crop(img, i, j, h, w, self.size, interpolation), \
+        #            F.resized_crop(img, i, j, h, w, self.second_size, self.second_interpolation)
 
     def __repr__(self):
         if isinstance(self.interpolation, (tuple, list)):
