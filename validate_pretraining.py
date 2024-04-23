@@ -108,7 +108,8 @@ def validate_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
             with torch.cuda.amp.autocast():
 
                 outputs = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=True)
-                corrupted_images = d_vae(outputs.reshape(-1, 8192, 8, 8), no_process=True)
+                corrupted_images = d_vae.decode(torch.argmax(outputs, axis=2))
+                # corrupted_images = d_vae(outputs.reshape(-1, 8192, 8, 8), no_process=True)
                 
                 # plt.subplot(1,3,1)
                 # plt.imshow(samples[1].detach().cpu().numpy().transpose(1,2,0))
