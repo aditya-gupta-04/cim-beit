@@ -66,9 +66,9 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
         is_second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
         grad_norm = loss_scaler(loss, optimizer, clip_grad=max_norm,
                                 parameters=model.parameters(), create_graph=is_second_order)
-        loss_scale_value = loss_scaler.state_dict()["scale"]
+        # loss_scale_value = loss_scaler.state_dict()["scale"]
 
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
 
         mlm_acc = (outputs.max(-1)[1] == labels).float().mean().item()
 
@@ -77,7 +77,7 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
             log_writer.update(mlm_acc=mlm_acc, head="loss")
 
         metric_logger.update(loss=loss_value)
-        metric_logger.update(loss_scale=loss_scale_value)
+        # metric_logger.update(loss_scale=loss_scale_value)
         min_lr = 10.
         max_lr = 0.
         for group in optimizer.param_groups:
@@ -95,7 +95,7 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
 
         if log_writer is not None:
             log_writer.update(loss=loss_value, head="loss")
-            log_writer.update(loss_scale=loss_scale_value, head="opt")
+            # log_writer.update(loss_scale=loss_scale_value, head="opt")
             log_writer.update(lr=max_lr, head="opt")
             log_writer.update(min_lr=min_lr, head="opt")
             log_writer.update(weight_decay=weight_decay_value, head="opt")
