@@ -137,7 +137,7 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
 @register_model
 def beit_small(pretrained=False, **kwargs):
     model = VisionTransformerForMaskedImageModeling(
-        patch_size=8, embed_dim=768, depth=6, num_heads=6, mlp_ratio=4, qkv_bias=True,
+        img_size=64, patch_size=8, embed_dim=768, depth=6, num_heads=6, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), vocab_size=8192, **kwargs)
     model.default_cfg = _cfg()
     if pretrained:
