@@ -24,12 +24,12 @@ for cl in range(200):
     os.mkdir(f"tiny_imagenet/val/{cl}")
 
 for idx in tqdm(train_df.index):
-    row = train_df.loc[0]
+    row = train_df.loc[idx]
     image = Image.open(io.BytesIO(row["image"]["bytes"]))
     image.save("tiny_imagenet/train/{}/{:d}.jpg".format(row["label"], idx))
     
 for idx in tqdm(val_df.index):
-    row = val_df.loc[0]
+    row = val_df.loc[idx]
     image = Image.open(io.BytesIO(row["image"]["bytes"]))
     image.save("tiny_imagenet/val/{}/{:d}.jpg".format(row["label"], idx))
 '
