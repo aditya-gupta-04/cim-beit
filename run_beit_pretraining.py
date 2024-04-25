@@ -130,6 +130,7 @@ def get_args():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
 
     parser.add_argument('--distributed', default=False)
+    parser.add_argument('--load_wts_beit_base', default=False)
 
     return parser.parse_args()
 
@@ -146,6 +147,19 @@ def get_model(args):
         init_values=args.layer_scale_init_value,
     )
 
+    if args.load_wts_beit_base:
+        checkpoint_file = "https://github.com/addf400/files/releases/download/v1.0/beit_base_patch16_224_pt22k.pth"
+        checkpoint = torch.hub.load_state_dict_from_url(checkpoint_file, map_location='cpu', check_hash=True)
+    
+        for param_name, param in model.named_parameters():
+            if param_name in list(checkpoint['model'].keys()):
+                if param.size() == checkpoint['model'][param_name].size():
+                    param.data.copy_(checkpoint['model'][param_name])
+                else:
+                    print(f"Parameter shape mismatch for {param_name}. Skipping...")
+            else:
+                print(f"Parameter {param_name} not found in the checkpoint. Skipping...")
+                
     return model
 
 
