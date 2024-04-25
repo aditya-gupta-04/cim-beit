@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 
 import utils
+import matplotlib.pyplot as plt
 
 
 def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
@@ -54,6 +55,22 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
         with torch.cuda.amp.autocast():
             outputs = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=False)
             loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
+
+
+        if step == epoch:
+            with torch.no_grad():
+                with torch.cuda.amp.autocast():
+                    outputs2 = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=True)
+                    corrupted_images = d_vae.decode(torch.argmax(outputs2, axis=2))
+                    
+                    plt.subplot(1,3,1)
+                    plt.imshow(samples[1].detach().cpu().numpy().transpose(1,2,0))
+                    plt.subplot(1,3,2)
+                    plt.imshow(images[1].detach().cpu().numpy().transpose(1,2,0))
+                    plt.subplot(1,3,3)
+                    plt.imshow(corrupted_images[1].detach().cpu().numpy().transpose(1,2,0)[:,:,:3])
+                    plt.savefig(f"res/{step}.png")
+
 
         loss_value = loss.item()
 
