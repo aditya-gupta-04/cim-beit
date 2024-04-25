@@ -219,7 +219,7 @@ def main(args):
     print("Number of training examples per epoch = %d" % (total_batch_size * num_training_steps_per_epoch))
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0, 1], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=None, find_unused_parameters=True)
         model_without_ddp = model.module
 
     optimizer = create_optimizer(
