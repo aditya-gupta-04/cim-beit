@@ -57,7 +57,7 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
             loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
 
 
-        if step == epoch:
+        if step == (epoch % 200):
             with torch.no_grad():
                 with torch.cuda.amp.autocast():
                     outputs2 = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=True)
