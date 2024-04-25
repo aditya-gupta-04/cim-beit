@@ -219,6 +219,11 @@ def main(args):
     print("Number of training examples per epoch = %d" % (total_batch_size * num_training_steps_per_epoch))
 
     if args.distributed:
+        if not torch.distributed.is_initialized():
+            dist.init_process_group(backend='nccl', init_method='env://')
+        
+        os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=None, find_unused_parameters=True)
         model_without_ddp = model.module
 
