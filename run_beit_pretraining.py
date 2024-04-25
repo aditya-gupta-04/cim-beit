@@ -220,7 +220,7 @@ def main(args):
 
     if args.distributed:
         if not torch.distributed.is_initialized():
-            dist.init_process_group(backend='nccl', init_method='env://')
+            torch.distributed.init_process_group(backend='nccl', init_method='env://')
         
         os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 
