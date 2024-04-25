@@ -159,6 +159,12 @@ def get_model(args):
                     print(f"Parameter shape mismatch for {param_name}. Skipping...")
             else:
                 print(f"Parameter {param_name} not found in the checkpoint. Skipping...")
+
+
+    if args.resume != '':
+        checkpoint = torch.load(args.resume)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint {args.resume}")
                 
     return model
 
