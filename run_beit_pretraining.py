@@ -163,8 +163,9 @@ def get_model(args):
 
     if args.resume != '':
         checkpoint = torch.load(args.resume)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model'])
         print(f"Loaded checkpoint {args.resume}")
+
                 
     return model
 
