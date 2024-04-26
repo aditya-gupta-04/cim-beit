@@ -104,20 +104,26 @@ def validate_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
 
         with torch.no_grad():
             bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+            input_ids = d_vae.get_codebook_indices(images).flatten(1)
+            true_tokens = input_ids[~bool_masked_pos]
 
             with torch.cuda.amp.autocast():
+                outputs = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=False)
 
-                outputs = model(samples, bool_masked_pos=bool_masked_pos, return_all_tokens=True)
-                corrupted_images = d_vae.decode(torch.argmax(outputs, axis=2))
-                # corrupted_images = d_vae(outputs.reshape(-1, 8192, 8, 8), no_process=True)
+                corrupted_img_tokens = torch.zeros(bool_masked_pos.flatten().shape).cuda().to(true_tokens.dtype)
+                corrupted_img_tokens[bool_masked_pos.flatten()] = torch.argmax(outputs, axis=1)
+                corrupted_img_tokens[~bool_masked_pos.flatten()] = true_tokens
+
+                corrupted_images = d_vae.decode(corrupted_img_tokens.view(images.shape[0], -1))
                 
-                # plt.subplot(1,3,1)
-                # plt.imshow(samples[1].detach().cpu().numpy().transpose(1,2,0))
-                # plt.subplot(1,3,2)
-                # plt.imshow(images[1].detach().cpu().numpy().transpose(1,2,0))
-                # plt.subplot(1,3,3)
-                # plt.imshow(corrupted_images[1].detach().cpu().numpy().transpose(1,2,0)[:,:,:3])
-                # plt.savefig("images.png")
+                for i in range(images.shape[0]):
+                    plt.subplot(1,3,1)
+                    plt.imshow(samples[i].detach().cpu().numpy().transpose(1,2,0))
+                    plt.subplot(1,3,2)
+                    plt.imshow(images[i].detach().cpu().numpy().transpose(1,2,0))
+                    plt.subplot(1,3,3)
+                    plt.imshow(corrupted_images[i].detach().cpu().numpy().transpose(1,2,0)[:,:,:3])
+                    plt.savefig(f"results/{step*images.shape[0] + i}.png")
 
 
 
